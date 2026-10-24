@@ -32,10 +32,13 @@ export interface ScoreInput {
 export interface ScoreOutput {
   result: ScoringResult;
   model: string;
-  /** Number of model calls that were needed (1 = valid first time). */
   attempts: number;
+  elapsedMs: number;
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+  };
 }
-
 /**
  * Ask the LLM for suggested scores. Nothing it returns is accepted unchecked:
  *
@@ -49,14 +52,29 @@ export interface ScoreOutput {
  * not use up repair attempts.
  */
 export async function scoreTranscript(input: ScoreInput): Promise<ScoreOutput> {
-  const ai = new GoogleGenAI({ apiKey: requireEnv("GOOGLE_AI_API_KEY") });
+  const ai = new GoogleGenAI({
+  apiKey: requireEnv("GOOGLE_AI_API_KEY"),
+  httpOptions: {
+    timeout: 60_000,
+    retryOptions: {
+      attempts: 1,
+    },
+  },
+});
   const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
   const temperature = resolveTemperature();
   const { system, user } = buildScoringPrompt(input);
 
-  const generate = (contents: string): Promise<string> =>
-    withRetry(
-      async () => {
+  let scoringElapsedMs = 0;
+let inputTokens = 0;
+let outputTokens = 0;
+
+const generate = (contents: string): Promise<string> =>
+  withRetry(
+    async () => {
+      const started = Date.now();
+
+      try {
         const response = await ai.models.generateContent({
           model,
           contents,
@@ -67,11 +85,20 @@ export async function scoreTranscript(input: ScoreInput): Promise<ScoreOutput> {
             temperature,
           },
         });
-        return response.text ?? "";
-      },
-      { stage: "scoring" },
-    );
 
+        scoringElapsedMs += Date.now() - started;
+
+        inputTokens += response.usageMetadata?.promptTokenCount ?? 0;
+        outputTokens += response.usageMetadata?.candidatesTokenCount ?? 0;
+
+        return response.text ?? "";
+      } catch (error) {
+        scoringElapsedMs += Date.now() - started;
+        throw error;
+      }
+    },
+    { stage: "scoring" },
+  );
   let prompt = user;
   let evidenceRetries = 0;
   let problems: string[] = [];
@@ -109,6 +136,11 @@ export async function scoreTranscript(input: ScoreInput): Promise<ScoreOutput> {
       },
       model,
       attempts: attempt + 1,
+      elapsedMs: scoringElapsedMs,
+      usage: {
+    	inputTokens,
+    	outputTokens,
+      },
     };
   }
 

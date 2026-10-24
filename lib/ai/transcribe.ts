@@ -1,5 +1,5 @@
 import Groq from "groq-sdk";
-import { AIError, classifyError, requireEnv, withRetry } from "./errors";
+import { AIError, requireEnv, withRetry } from "./errors";
 import { mimeFromPath, type AudioFetcher } from "./storage";
 
 export const WHISPER_MODELS = ["whisper-large-v3-turbo", "whisper-large-v3"] as const;
@@ -40,6 +40,9 @@ export interface TranscribeOutput {
   durationSeconds?: number;
   segments: TranscriptSegment[];
   model: string;
+  /** Time spent on the Groq call, including retries. */
+  elapsedMs?: number;
+  audioBytes?: number;
 }
 
 interface VerboseTranscription {
@@ -94,6 +97,7 @@ export async function transcribeAudio(input: TranscribeInput): Promise<Transcrib
   const language = resolveLanguage(input.language);
   const prompt = (input.prompt ?? process.env.GROQ_WHISPER_PROMPT ?? "").trim();
 
+  const startedAt = Date.now();
   const response = await withRetry(
     async () => {
       const file = new File([input.audio as BlobPart], input.filename, { type: input.mimeType });
@@ -134,7 +138,15 @@ export async function transcribeAudio(input: TranscribeInput): Promise<Transcrib
     );
   }
 
-  return { text, language: verbose.language, durationSeconds: verbose.duration, segments, model };
+  return {
+    text,
+    language: verbose.language,
+    durationSeconds: verbose.duration,
+    segments,
+    model,
+    elapsedMs: Date.now() - startedAt,
+    audioBytes: input.audio.byteLength,
+  };
 }
 
 export interface TranscribeFromStorageOptions {
@@ -150,31 +162,8 @@ export async function transcribeFromStorage(
   storagePath: string,
   options: TranscribeFromStorageOptions,
 ): Promise<TranscribeOutput> {
-  const fetched = await withRetry(
-  async () => {
-    try {
-      return await options.fetchAudio(storagePath);
-    } catch (err) {
-      const error = classifyError(err, "transcription");
+  const fetched = await withRetry(() => options.fetchAudio(storagePath), { stage: "transcription" });
 
-      if (
-        error.code === "BAD_INPUT" &&
-        /not found|missing/i.test(error.message)
-      ) {
-        throw new AIError(
-          error.message,
-          "AUDIO_MISSING",
-          "transcription",
-          false,
-          { cause: err },
-        );
-      }
-
-      throw error;
-    }
-  },
-  { stage: "transcription" },
-);
   const filename = storagePath.split("/").pop() || "recording.webm";
   return transcribeAudio({
     audio: fetched.data,

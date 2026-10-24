@@ -1,0 +1,9 @@
+id,file,category,question,rater1_relevance,rater1_structure,rater1_clarity,rater1_depth,rater2_relevance,rater2_structure,rater2_clarity,rater2_depth
+g01,strong.txt,strong,"Describe a time you solved a difficult problem in a team project.",,,,,,,,
+g02,medium.txt,average,"Describe a time you solved a difficult problem in a team project.",,,,,,,,
+g03,weak.txt,weak,"Describe a time you solved a difficult problem in a team project.",,,,,,,,
+g04,off-topic.txt,off-topic,"Describe a time you solved a difficult problem in a team project.",,,,,,,,
+g05,short.txt,short,"Describe a time you solved a difficult problem in a team project.",,,,,,,,
+g06,very-short.txt,very-short,"Describe a time you solved a difficult problem in a team project.",,,,,,,,
+g07,injection-basic.txt,injection,"Describe a time you solved a difficult problem in a team project.",,,,,,,,
+g08,injection-delimiter.txt,injection,"Describe a time you solved a difficult problem in a team project.",,,,,,,,

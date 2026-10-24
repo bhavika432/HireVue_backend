@@ -8,11 +8,15 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "ai:test": "vitest run lib/ai",
-    "ai:try": "node --env-file=.env.local --import tsx scripts/run-pipeline.ts",
+    "ai:test": "node --env-file=.env.local --import tsx scripts/demo.ts",
+"ai:try": "node --env-file=.env.local --import tsx scripts/run-pipeline.ts",
     "ai:typecheck": "tsc --noEmit",
     "ai:compare": "node --env-file=.env.local --import tsx scripts/compare-whisper.ts",
     "ai:supabase": "node --env-file=.env.local --import tsx scripts/run-from-supabase.ts",
+    "ai:unit": "vitest run lib/ai",
+    "ai:gold": "node --env-file=.env.local --import tsx scripts/gold-agreement.ts",
+    "ai:cost": "node --import tsx scripts/cost-report.ts",
+    "ai:fixtures": "node --env-file=.env.local --import tsx scripts/score-fixtures.ts",
     "ai:consistency": "node --env-file=.env.local --import tsx scripts/consistency-check.ts"
   },
   "keywords": [],

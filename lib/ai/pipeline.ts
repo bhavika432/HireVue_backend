@@ -1,6 +1,7 @@
 import { AIError, classifyError, withRetry, type AIErrorCode, type AIStage } from "./errors";
 import { scoreTranscript } from "./score";
 import type { AudioFetcher, TranscriptStore } from "./storage";
+import { buildUsageRecord, type UsageRecord } from "./usage";
 import { transcribeAudio, transcribeFromStorage, type TranscribeOutput } from "./transcribe";
 import type { ScoringResult } from "./validate";
 
@@ -45,14 +46,7 @@ export async function transcribeResponse(input: TranscribeResponseInput): Promis
       language: input.language,
       prompt: input.prompt,
     });
-    await withRetry(
-  () => store.saveTranscript({ responseId, transcript }),
-  {
-    stage: "transcription",
-    maxAttempts: 3,
-    delaysMs: [2000, 8000],
-  },
-);
+    await withRetry(() => store.saveTranscript({ responseId, transcript }), { stage: "transcription" });
     await withRetry(() => store.setStatus({ responseId, status: "transcribed" }), { stage: "transcription" });
     return { ok: true, status: "transcribed", transcript };
   } catch (err) {
@@ -102,6 +96,8 @@ export interface PipelineMeta {
   durationSeconds?: number;
   language?: string;
   elapsedMs: number;
+  /** Time per stage, tokens and rough cost estimate for this response. */
+  usage: UsageRecord;
 }
 
 export interface PipelineFailure {
@@ -177,6 +173,18 @@ export async function processRecording(input: PipelineInput): Promise<PipelineRe
         durationSeconds: transcription?.durationSeconds ?? input.durationSeconds,
         language: transcription?.language,
         elapsedMs: Date.now() - started,
+        usage: buildUsageRecord({
+          transcription: transcription
+            ? {
+                model: transcription.model,
+                elapsedMs: transcription.elapsedMs,
+                durationSeconds: transcription.durationSeconds,
+                audioBytes: transcription.audioBytes,
+              }
+            : undefined,
+          scored: { model: scored.model, elapsedMs: scored.elapsedMs, attempts: scored.attempts, usage: scored.usage },
+          totalMs: Date.now() - started,
+        }),
       },
     };
   } catch (err) {

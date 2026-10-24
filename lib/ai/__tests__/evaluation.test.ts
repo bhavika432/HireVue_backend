@@ -181,8 +181,18 @@ describe("saveEvaluationResult", () => {
         status: "scored",
         transcript: "my transcript",
         scoring,
-        meta: { scoringModel: "gemini-x", rubricVersion: "v1", promptVersion: "p2", elapsedMs: 5, durationSeconds: 15 },
-      },
+       meta: {
+  scoringModel: "gemini-x",
+  rubricVersion: "v1",
+  promptVersion: "p2",
+  elapsedMs: 5,
+  durationSeconds: 15,
+  usage: {
+    at: new Date().toISOString(),
+    totalMs: 5,
+    estCostUsd: null,
+  },
+},      },
       { transcriptionModel: "whisper-x" },
     );
     expect(row.ai_status).toBe("completed");

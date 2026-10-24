@@ -29,7 +29,7 @@ Server-side only. Put them in `.env.local` and never use a `NEXT_PUBLIC_` prefix
 | `GROQ_WHISPER_PROMPT` | no | empty | Short vocabulary hint (program name, technical terms), max about 224 tokens |
 | `GROQ_MAX_AUDIO_MB` | no | `25` | Upload limit: 25 on the free tier, 100 on the dev tier |
 | `SUPABASE_SERVICE_ROLE_KEY` | Member 2's helpers | - | Server-only; used by the storage and database helpers, not by `/lib/ai/` itself |
-| `GEMINI_MODEL` | no | `gemini-2.5-flash` | Scoring model |
+| `GEMINI_MODEL` | no | `gemini-3.8-flash` | Scoring model |
 
 ## Usage
 
@@ -103,7 +103,7 @@ Pick the model with the lower error rate on your accented and noisy samples, unl
 
 ```bash
 npm install
-npm run ai:test        # offline unit tests (no API keys needed)
+npm run ai:unit        # offline unit tests (no API keys needed)
 npm run ai:typecheck
 ```
 
@@ -254,3 +254,17 @@ Every request must carry `PIPELINE_SECRET` as `x-pipeline-secret` (or `Authoriza
 **Serverless time limits.** Each request gets a budget (`PIPELINE_BUDGET_MS`, default 50 s) that must stay below the function's `maxDuration` (set to 60 in the routes: confirm what your hosting plan allows). If transcription finishes but less than 20 s remain, the run stops with status `transcribed` and the next run only scores, so work is queue-friendly and a long recording can never be half-saved. Set `PIPELINE_STALE_MINUTES` to about twice the time limit so a crashed run is taken over quickly. A single Groq call that itself takes longer than the limit cannot be split: cap answer length in the frontend, or move processing to a worker.
 
 Status names: Phase 7 calls the final status `scored` and the first one `uploaded`; in the database these are `completed` and `queued` (Member 2's enum), and `responses` is `student_responses`.
+
+## Phase 8: demo, gold set, cost
+
+```bash
+npm run ai:test -- path/to/audio.webm "Question text"   # demo: transcript, scores with evidence, time and cost
+npm run ai:test -- --transcript file.txt                 # same, from a transcript
+npm run ai:gold -- --notes "what changed"                # score the gold set, log agreement per rubric/prompt version
+npm run ai:cost -- --students 300 --questions 5          # latency summary and cost projection
+```
+
+- `ai:test` is now the demo; the vitest suite moved to `npm run ai:unit`.
+- Gold set: `ai-fixtures/gold/` (see its README). Two humans score each transcript independently; results append to `ai-logs/agreement-results.csv`, one row per run, ready for a spreadsheet.
+- Usage log: every run appends to `ai-logs/usage.jsonl` (time per stage, tokens, estimated cost). Set `GEMINI_INPUT_PRICE_PER_M` and `GEMINI_OUTPUT_PRICE_PER_M` to include the Gemini bill; Groq rates in `usage.ts` are estimates, so check current pricing.
+- Validator and retry unit tests: `validate`, `checks`, `score-repair` and `errors` tests.
